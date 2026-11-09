@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://165.99.43.66:3306/industry_platform?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&connectTimeout=10000&socketTimeout=60000}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  ai:
+    openai:
+      api-key: ${SPRING_AI_OPENAI_API_KEY:${LLM_API_KEY:${MATCHING_LLM_API_KEY:}}}
+
+llm:
+  api-key: ${LLM_API_KEY:${MATCHING_LLM_API_KEY:}}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-weak-secret-please-change-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz}
+    expiration: 7200
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+
+logging:
+  level:
+    git.ggwzz: INFO
+    org.springframework.security: INFO
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.matching.mapper.MatchingResultMapper">
+
+    <resultMap id="matchingDecisionRowMap"
+               type="git.ggwzz.dashboard.mapper.projection.MatchingDecisionRow">
+        <id column="decision" property="decision"/>
+        <result column="cnt" property="cnt"/>
+        <result column="avg_confidence" property="avgConfidence"/>
+    </resultMap>
+
+    <resultMap id="dayRecommendationRowMap"
+               type="git.ggwzz.dashboard.mapper.projection.DayRecommendationRow">
+        <id column="day_of_week" property="dayOfWeek"/>
+        <result column="recommendations" property="recommendations"/>
+        <result column="accepted" property="accepted"/>
+    </resultMap>
+
+    <select id="selectDecisionSummary"
+            resultMap="matchingDecisionRowMap">
+        SELECT decision,
+               COUNT(*) AS cnt,
+               AVG(COALESCE(confidence, 0)) AS avg_confidence
+        FROM matching_result
+        GROUP BY decision
+    </select>
+
+    <select id="selectWeeklyRecommendations"
+            resultMap="dayRecommendationRowMap">
+        SELECT DAYOFWEEK(created_at) AS day_of_week,
+               COUNT(*) AS recommendations,
+               SUM(CASE WHEN decision = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted
+        FROM matching_result
+        WHERE created_at >= #{weekStart}
+        GROUP BY DAYOFWEEK(created_at)
+        ORDER BY DAYOFWEEK(created_at)
+    </select>
+
+</mapper>

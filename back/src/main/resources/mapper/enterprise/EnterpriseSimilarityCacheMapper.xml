@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.enterprise.mapper.EnterpriseSimilarityCacheMapper">
+    <resultMap id="similarityCacheRowMap"
+               type="git.ggwzz.enterprise.mapper.projection.EnterpriseSimilarityCacheRow">
+        <result column="target_enterprise_id" property="targetEnterpriseId"/>
+        <result column="similarity" property="similarity"/>
+        <result column="reasons" property="reasons"/>
+    </resultMap>
+
+    <select id="selectMatchedCache" resultMap="similarityCacheRowMap">
+        SELECT target_enterprise_id, similarity, reasons
+        FROM enterprise_similarity_cache
+        WHERE source_enterprise_id = #{sourceEnterpriseId}
+          AND model_name = #{modelName}
+          AND source_text_hash = #{sourceTextHash}
+          AND is_deleted = 0
+        <choose>
+            <when test="targetHashes != null and targetHashes.size() > 0">
+                AND (
+                <foreach item="item" collection="targetHashes" separator=" OR ">
+                    (target_enterprise_id = #{item.targetEnterpriseId}
+                     AND target_text_hash = #{item.targetTextHash})
+                </foreach>
+                )
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+
+    <insert id="upsertSimilarity">
+        INSERT INTO enterprise_similarity_cache
+            (source_enterprise_id, target_enterprise_id, model_name, source_text_hash,
+             target_text_hash, similarity, reasons, is_deleted)
+        VALUES
+            (#{sourceEnterpriseId}, #{targetEnterpriseId}, #{modelName}, #{sourceTextHash},
+             #{targetTextHash}, #{similarity}, #{reasons}, 0)
+        ON DUPLICATE KEY UPDATE
+            similarity = VALUES(similarity),
+            reasons = VALUES(reasons),
+            update_time = CURRENT_TIMESTAMP,
+            is_deleted = 0
+    </insert>
+</mapper>

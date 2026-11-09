@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.chain.mapper.ChainNodeMapper">
+
+    <resultMap id="nodeSubtreeCountRowMap"
+               type="git.ggwzz.dashboard.mapper.projection.NodeSubtreeCountRow">
+        <id column="node_id" property="nodeId"/>
+        <result column="node_name" property="nodeName"/>
+        <result column="enterprise_count" property="enterpriseCount"/>
+    </resultMap>
+
+    <select id="selectRootNodeSubtreeCounts"
+            resultMap="nodeSubtreeCountRowMap">
+        SELECT n_root.id AS node_id,
+               n_root.node_name,
+               COUNT(DISTINCT r.enterprise_id) AS enterprise_count
+        FROM chain_node n_root
+        LEFT JOIN chain_node n
+               ON n.chain_id = n_root.chain_id
+              AND n.node_path LIKE CONCAT(n_root.node_path, '%')
+              AND n.is_deleted = 0
+        LEFT JOIN enterprise_node_rel r
+               ON r.node_id = n.id
+              AND r.is_deleted = 0
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE n_root.parent_id IS NULL
+          AND n_root.is_deleted = 0
+        GROUP BY n_root.id, n_root.node_name
+        ORDER BY n_root.chain_id, n_root.sort_order, n_root.id
+    </select>
+
+    <update id="updateSubtree">
+        UPDATE chain_node
+        SET node_path = CONCAT(
+                #{newPath},
+                SUBSTRING(
+                    node_path,
+                    CHAR_LENGTH(#{oldPath}) + 1
+                )
+            ),
+            node_level = node_level + #{levelOffset},
+            parent_id = CASE
+                WHEN id = #{nodeId}
+                THEN #{newParentId,jdbcType=BIGINT}
+                ELSE parent_id
+            END,
+        <if test="sortOrder != null">
+            sort_order = CASE
+                WHEN id = #{nodeId} THEN #{sortOrder}
+                ELSE sort_order
+            END,
+        </if>
+            update_time = CURRENT_TIMESTAMP
+        WHERE chain_id = #{chainId}
+          AND is_deleted = 0
+          AND node_path LIKE #{oldPathPattern}
+    </update>
+
+</mapper>

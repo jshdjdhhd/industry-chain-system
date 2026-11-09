@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.chain.mapper.ChainMapper">
+
+    <resultMap id="chainSummaryCountRowMap"
+               type="git.ggwzz.chain.mapper.projection.ChainSummaryCountRow">
+        <id column="chain_id" property="chainId"/>
+        <result column="node_count" property="nodeCount"/>
+        <result column="enterprise_count" property="enterpriseCount"/>
+    </resultMap>
+
+    <select id="selectSummaryCountsByChainIds"
+            resultMap="chainSummaryCountRowMap">
+        SELECT n.chain_id,
+               COUNT(DISTINCT n.id) AS node_count,
+               COUNT(DISTINCT CASE
+                   WHEN e.id IS NOT NULL THEN r.enterprise_id
+                   ELSE NULL
+               END) AS enterprise_count
+        FROM chain_node n
+        LEFT JOIN enterprise_node_rel r
+               ON r.node_id = n.id
+              AND r.is_deleted = 0
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE n.is_deleted = 0
+          AND n.chain_id IN
+          <foreach collection="chainIds"
+                   item="chainId"
+                   open="("
+                   separator=","
+                   close=")">
+              #{chainId}
+          </foreach>
+        GROUP BY n.chain_id
+    </select>
+
+</mapper>

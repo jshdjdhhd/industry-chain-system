@@ -1,0 +1,102 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  application:
+    name: industry_platform
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
+  ai:
+    openai:
+      api-key: ${SPRING_AI_OPENAI_API_KEY:${LLM_API_KEY:}}
+      base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.xiaomimimo.com}
+      chat:
+        options:
+          model: ${SPRING_AI_OPENAI_MODEL:mimo-v2.5-pro-ultraspeed}
+          temperature: ${SPRING_AI_OPENAI_TEMPERATURE:0.0}
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 7200
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+
+logging:
+  level:
+    root: INFO
+
+analysis:
+  report:
+    storage-dir: ${ANALYSIS_REPORT_DIR:./data/reports/analysis}
+
+llm:
+  # 通用大模型配置（健康分析报告等非挂链场景共用）。
+  provider: ${LLM_PROVIDER:mimo}
+  base-url: ${LLM_BASE_URL:https://api.xiaomimimo.com/v1}
+  model: ${LLM_MODEL:mimo-v2.5-pro-ultraspeed}
+  api-key: ${LLM_API_KEY:}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}
+  temperature: ${LLM_TEMPERATURE:0.0}
+  max-tokens: ${LLM_MAX_TOKENS:700}
+
+matching:
+  llm:
+    # 小米 MiMo OpenAI-compatible chat completions；API Key 只允许通过本地配置或环境变量注入。
+    provider: ${MATCHING_LLM_PROVIDER:mimo}
+    base-url: ${MATCHING_LLM_BASE_URL:https://api.xiaomimimo.com/v1}
+    model: ${MATCHING_LLM_MODEL:mimo-v2.5-pro-ultraspeed}
+    api-key: ${MATCHING_LLM_API_KEY:}
+    timeout-seconds: ${MATCHING_LLM_TIMEOUT_SECONDS:20}
+    candidate-top-k: ${MATCHING_LLM_CANDIDATE_TOP_K:6}
+    result-top-k: ${MATCHING_LLM_RESULT_TOP_K:3}
+    skip-rerank-confidence-threshold: ${MATCHING_LLM_SKIP_RERANK_CONFIDENCE_THRESHOLD:0.82}
+    min-result-confidence: ${MATCHING_LLM_MIN_RESULT_CONFIDENCE:0.65}
+    clear-winner-min-confidence-threshold: ${MATCHING_LLM_CLEAR_WINNER_MIN_CONFIDENCE_THRESHOLD:0.70}
+    clear-winner-gap-threshold: ${MATCHING_LLM_CLEAR_WINNER_GAP_THRESHOLD:0.08}
+    strong-rule-confidence-threshold: ${MATCHING_LLM_STRONG_RULE_CONFIDENCE_THRESHOLD:0.90}
+    strong-evidence-min-vector-score: ${MATCHING_LLM_STRONG_EVIDENCE_MIN_VECTOR_SCORE:0.55}
+    temperature: ${MATCHING_LLM_TEMPERATURE:0.0}
+    # 内部配置名沿用 max-tokens，发送 MiMo 请求时映射为官方字段 max_completion_tokens。
+    max-tokens: ${MATCHING_LLM_MAX_TOKENS:700}
+  embedding:
+    # 本地 Ollama + Qwen3 Embedding 推理服务，使用 OpenAI-compatible /v1/embeddings 接口。
+    timeout-seconds: ${MATCHING_EMBEDDING_TIMEOUT_SECONDS:30}
+    endpoint: ${LOCAL_EMBEDDING_ENDPOINT:http://localhost:11434/v1/embeddings}
+    model: ${LOCAL_EMBEDDING_MODEL:qwen3-embedding:0.6b}
+    api-key: ${LOCAL_EMBEDDING_API_KEY:}
+    dimension: ${LOCAL_EMBEDDING_DIMENSION:1024}
+    hybrid:
+      vector-weight: ${MATCHING_VECTOR_WEIGHT:0.70}
+      rule-weight: ${MATCHING_RULE_WEIGHT:0.30}
+      min-vector-score: ${MATCHING_MIN_VECTOR_SCORE:0.25}
+      top-k: ${MATCHING_TOP_K:5}
+      rule-only-fast-path-confidence: ${MATCHING_RULE_ONLY_FAST_PATH_CONFIDENCE:0.95}
+      rule-only-fast-path-gap: ${MATCHING_RULE_ONLY_FAST_PATH_GAP:0.20}

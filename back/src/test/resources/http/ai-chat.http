@@ -1,0 +1,93 @@
+### AI 聊天 - 通用模式
+POST http://localhost:8080/api/matching/ai-chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "什么是产业链？"
+}
+
+> {%
+client.test("通用模式返回 200", function() {
+  client.assert(response.status === 200, "HTTP 状态码应为 200");
+  client.assert(response.body.code === 200, "业务码应为 200");
+  client.assert(response.body.data.reply !== undefined, "应返回回复内容");
+});
+%}
+
+### AI 聊天 - 上下文模式
+POST http://localhost:8080/api/matching/ai-chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "enterpriseId": 1,
+  "chainId": 1,
+  "message": "分析这家企业的挂链风险",
+  "history": [
+    {
+      "role": "user",
+      "content": "上一条问题"
+    },
+    {
+      "role": "assistant",
+      "content": "上一条回答"
+    }
+  ]
+}
+
+> {%
+client.test("上下文模式返回 200", function() {
+  client.assert(response.status === 200, "HTTP 状态码应为 200");
+  client.assert(response.body.code === 200, "业务码应为 200");
+});
+%}
+
+### AI 聊天 - 空白消息应返回 400
+POST http://localhost:8080/api/matching/ai-chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "   "
+}
+
+> {%
+client.test("空白消息返回 400", function() {
+  client.assert(response.status === 400, "HTTP 状态码应为 400");
+  client.assert(response.body.code === 400, "业务码应为 400");
+});
+%}
+
+### AI 聊天 - 半选上下文应返回 400
+POST http://localhost:8080/api/matching/ai-chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "enterpriseId": 1,
+  "message": "测试"
+}
+
+> {%
+client.test("半选上下文返回 400", function() {
+  client.assert(response.status === 400, "HTTP 状态码应为 400");
+  client.assert(response.body.code === 400, "业务码应为 400");
+});
+%}
+
+### AI 聊天 - 流式通用模式
+POST http://localhost:8080/api/matching/ai-chat/stream
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "message": "简述产业链发展方向"
+}
+
+> {%
+client.test("流式接口返回 200", function() {
+  client.assert(response.status === 200, "HTTP 状态码应为 200");
+});
+%}

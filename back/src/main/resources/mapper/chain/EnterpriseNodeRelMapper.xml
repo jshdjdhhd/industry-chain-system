@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.chain.mapper.EnterpriseNodeRelMapper">
+
+    <resultMap id="nodeEnterpriseCountRowMap"
+               type="git.ggwzz.chain.mapper.projection.NodeEnterpriseCountRow">
+        <id column="node_id" property="nodeId"/>
+        <result column="direct_enterprise_count"
+                property="directEnterpriseCount"/>
+    </resultMap>
+
+    <resultMap id="nodeSubtreeEnterpriseCountRowMap"
+               type="git.ggwzz.chain.mapper.projection.NodeSubtreeEnterpriseCountRow">
+        <id column="node_id" property="nodeId"/>
+        <result column="subtree_enterprise_count"
+                property="subtreeEnterpriseCount"/>
+    </resultMap>
+
+    <resultMap id="enterpriseCountSummaryMap"
+               type="git.ggwzz.chain.mapper.projection.EnterpriseCountSummary">
+        <result column="direct_enterprise_count"
+                property="directEnterpriseCount"/>
+        <result column="total_enterprise_count"
+                property="totalEnterpriseCount"/>
+    </resultMap>
+
+    <resultMap id="chainEnterpriseCountRowMap"
+               type="git.ggwzz.dashboard.mapper.projection.ChainEnterpriseCountRow">
+        <id column="chain_id" property="chainId"/>
+        <result column="chain_name" property="chainName"/>
+        <result column="enterprise_count" property="enterpriseCount"/>
+    </resultMap>
+
+    <select id="selectEnterpriseCountByChain"
+            resultMap="chainEnterpriseCountRowMap">
+        SELECT c.id AS chain_id,
+               c.chain_name,
+               COUNT(DISTINCT r.enterprise_id) AS enterprise_count
+        FROM chain c
+        LEFT JOIN chain_node n
+               ON n.chain_id = c.id
+              AND n.is_deleted = 0
+        LEFT JOIN enterprise_node_rel r
+               ON r.node_id = n.id
+              AND r.is_deleted = 0
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE c.is_deleted = 0
+        GROUP BY c.id, c.chain_name
+    </select>
+
+    <select id="selectLinkedNodeIdsByEnterpriseAndChain"
+            resultType="java.lang.Long">
+        SELECT DISTINCT r.node_id
+        FROM enterprise_node_rel r
+        INNER JOIN chain_node n
+                ON n.id = r.node_id
+               AND n.is_deleted = 0
+        WHERE r.enterprise_id = #{enterpriseId}
+          AND n.chain_id = #{chainId}
+          AND r.is_deleted = 0
+        ORDER BY r.node_id
+    </select>
+
+    <select id="selectDirectCountsByChainId"
+            resultMap="nodeEnterpriseCountRowMap">
+        SELECT r.node_id,
+               COUNT(DISTINCT CASE
+                   WHEN e.id IS NOT NULL THEN r.enterprise_id
+                   ELSE NULL
+               END) AS direct_enterprise_count
+        FROM enterprise_node_rel r
+        INNER JOIN chain_node n ON n.id = r.node_id
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE n.chain_id = #{chainId}
+          AND n.is_deleted = 0
+          AND r.is_deleted = 0
+        GROUP BY r.node_id
+    </select>
+
+    <select id="selectEnterpriseCountSummary"
+            resultMap="enterpriseCountSummaryMap">
+        SELECT COUNT(DISTINCT CASE
+                   WHEN n.id = #{nodeId} AND e.id IS NOT NULL
+                   THEN r.enterprise_id
+                   ELSE NULL
+               END) AS direct_enterprise_count,
+               COUNT(DISTINCT CASE
+                   WHEN e.id IS NOT NULL THEN r.enterprise_id
+                   ELSE NULL
+               END) AS total_enterprise_count
+        FROM chain_node n
+        LEFT JOIN enterprise_node_rel r
+               ON r.node_id = n.id
+              AND r.is_deleted = 0
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE n.chain_id = #{chainId}
+          AND n.is_deleted = 0
+          AND n.node_path LIKE #{nodePathPattern}
+    </select>
+    <select id="selectSubtreeCountsByChainId"
+            resultMap="nodeSubtreeEnterpriseCountRowMap">
+        SELECT ancestor.id AS node_id,
+               COUNT(DISTINCT CASE
+                   WHEN e.id IS NOT NULL THEN r.enterprise_id
+                   ELSE NULL
+               END) AS subtree_enterprise_count
+        FROM chain_node ancestor
+        LEFT JOIN chain_node descendant
+               ON descendant.chain_id = ancestor.chain_id
+              AND descendant.node_path LIKE CONCAT(ancestor.node_path, '%')
+              AND descendant.is_deleted = 0
+        LEFT JOIN enterprise_node_rel r
+               ON r.node_id = descendant.id
+              AND r.is_deleted = 0
+        LEFT JOIN enterprise e
+               ON e.id = r.enterprise_id
+              AND e.is_deleted = 0
+        WHERE ancestor.chain_id = #{chainId}
+          AND ancestor.is_deleted = 0
+        GROUP BY ancestor.id
+    </select>
+
+    <update id="logicalDeleteByChainId">
+        UPDATE enterprise_node_rel
+        SET is_deleted = 1,
+            update_time = CURRENT_TIMESTAMP
+        WHERE is_deleted = 0
+          AND node_id IN (
+              SELECT id
+              FROM chain_node
+              WHERE chain_id = #{chainId}
+                AND is_deleted = 0
+          )
+    </update>
+    <select id="selectLinkedNodeIdsByEnterpriseAndChain"
+            resultType="java.lang.Long">
+        SELECT DISTINCT r.node_id
+        FROM enterprise_node_rel r
+        INNER JOIN chain_node n ON n.id = r.node_id
+        WHERE r.enterprise_id = #{enterpriseId}
+          AND n.chain_id = #{chainId}
+          AND r.is_deleted = 0
+          AND n.is_deleted = 0
+    </select>
+
+</mapper>

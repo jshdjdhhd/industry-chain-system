@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.enterprise.mapper.EnterpriseProfileAnalysisMapper">
+    <resultMap id="profileRowMap"
+               type="git.ggwzz.enterprise.mapper.projection.EnterpriseProfileAnalysisRow">
+        <id column="id" property="id"/>
+        <result column="enterprise_name" property="enterpriseName"/>
+        <result column="status" property="status"/>
+        <result column="industry" property="industry"/>
+        <result column="business_scope" property="businessScope"/>
+        <result column="main_products" property="mainProducts"/>
+        <result column="core_tech" property="coreTech"/>
+        <result column="keywords" property="keywords"/>
+        <result column="patent_info" property="patentInfo"/>
+        <result column="bid_info" property="bidInfo"/>
+        <result column="output_value" property="outputValue"/>
+        <result column="tax_amount" property="taxAmount"/>
+    </resultMap>
+
+    <resultMap id="linkStatRowMap"
+               type="git.ggwzz.enterprise.mapper.projection.EnterpriseLinkStatRow">
+        <id column="enterprise_id" property="enterpriseId"/>
+        <result column="linked_node_count" property="linkedNodeCount"/>
+        <result column="max_confidence" property="maxConfidence"/>
+        <result column="has_manual_link" property="hasManualLink"/>
+    </resultMap>
+
+    <resultMap id="tagTextRowMap"
+               type="git.ggwzz.enterprise.mapper.projection.EnterpriseTagTextRow">
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="tag_name" property="tagName"/>
+    </resultMap>
+
+    <sql id="profileColumns">
+        id, enterprise_name, status, industry, business_scope, main_products,
+        core_tech, keywords, patent_info, bid_info, output_value, tax_amount
+    </sql>
+
+    <select id="selectProfileById" resultMap="profileRowMap">
+        SELECT <include refid="profileColumns"/>
+        FROM enterprise
+        WHERE id = #{id}
+          AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="selectActiveCandidates" resultMap="profileRowMap">
+        SELECT <include refid="profileColumns"/>
+        FROM enterprise
+        WHERE status = 'ACTIVE'
+          AND is_deleted = 0
+          AND id != #{excludeEnterpriseId}
+        ORDER BY id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectSameIndustryActiveCandidates" resultMap="profileRowMap">
+        SELECT <include refid="profileColumns"/>
+        FROM enterprise
+        WHERE status = 'ACTIVE'
+          AND is_deleted = 0
+          AND id != #{excludeEnterpriseId}
+          AND industry = #{industry}
+        ORDER BY id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectTagTextsByEnterpriseId" resultType="java.lang.String">
+        SELECT t.tag_name
+        FROM enterprise_tag_rel r
+        INNER JOIN tag t ON t.id = r.tag_id
+        WHERE r.enterprise_id = #{enterpriseId}
+          AND t.is_deleted = 0
+        ORDER BY r.id
+    </select>
+
+    <select id="selectTagTextsByEnterpriseIds" resultMap="tagTextRowMap">
+        SELECT r.enterprise_id, t.tag_name
+        FROM enterprise_tag_rel r
+        INNER JOIN tag t ON t.id = r.tag_id
+        WHERE t.is_deleted = 0
+        <choose>
+            <when test="enterpriseIds != null and enterpriseIds.size() > 0">
+                AND r.enterprise_id IN
+                <foreach item="id" collection="enterpriseIds" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
+        ORDER BY r.enterprise_id, r.id
+    </select>
+
+    <select id="selectLinkStatsByEnterpriseIds" resultMap="linkStatRowMap">
+        SELECT enterprise_id,
+               COUNT(DISTINCT node_id) AS linked_node_count,
+               MAX(confidence) AS max_confidence,
+               MAX(CASE WHEN source = 'MANUAL' THEN 1 ELSE 0 END) AS has_manual_link
+        FROM enterprise_node_rel
+        WHERE is_deleted = 0
+        <choose>
+            <when test="enterpriseIds != null and enterpriseIds.size() > 0">
+                AND enterprise_id IN
+                <foreach item="id" collection="enterpriseIds" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
+        GROUP BY enterprise_id
+    </select>
+</mapper>

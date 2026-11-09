@@ -1,0 +1,32 @@
+# Build
+target/
+build/
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# Logs
+logs/
+*.log
+
+# Sensitive local config (never commit real secrets)
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# smart-doc output
+src/main/resources/static/doc/
+
+.front/

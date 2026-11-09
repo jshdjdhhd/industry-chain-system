@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="git.ggwzz.analysis.mapper.AnalysisQueryMapper">
+
+    <resultMap id="enterpriseProfileRowMap"
+               type="git.ggwzz.analysis.mapper.projection.EnterpriseProfileRow">
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="node_id" property="nodeId"/>
+        <result column="node_path" property="nodePath"/>
+        <result column="has_output_value" property="hasOutputValue"/>
+        <result column="has_tax_amount" property="hasTaxAmount"/>
+        <result column="has_tag" property="hasTag"/>
+        <result column="has_main_products" property="hasMainProducts"/>
+        <result column="has_core_tech" property="hasCoreTech"/>
+    </resultMap>
+
+    <resultMap id="enterpriseProfileDetailRowMap"
+               type="git.ggwzz.analysis.mapper.projection.EnterpriseProfileDetailRow">
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="node_id" property="nodeId"/>
+        <result column="enterprise_name" property="enterpriseName"/>
+        <result column="status" property="status"/>
+        <result column="region" property="region"/>
+        <result column="industry" property="industry"/>
+        <result column="main_products" property="mainProducts"/>
+        <result column="core_tech" property="coreTech"/>
+        <result column="output_value" property="outputValue"/>
+        <result column="tax_amount" property="taxAmount"/>
+        <result column="tag_names" property="tagNames"/>
+    </resultMap>
+
+    <resultMap id="matchingEvidenceRowMap"
+               type="git.ggwzz.analysis.mapper.projection.MatchingEvidenceRow">
+        <result column="result_id" property="resultId"/>
+        <result column="task_id" property="taskId"/>
+        <result column="enterprise_id" property="enterpriseId"/>
+        <result column="enterprise_name" property="enterpriseName"/>
+        <result column="node_id" property="nodeId"/>
+        <result column="confidence" property="confidence"/>
+        <result column="reason" property="reason"/>
+        <result column="evidence" property="evidence"/>
+        <result column="decision" property="decision"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <!--
+      7.1 健康度计算口径：一次查询取该链下全部有效挂链企业的画像完整性布尔字段
+      及挂载节点路径。JOIN chain_node + enterprise_node_rel + enterprise 共 3 张表；
+      标签是否存在用 EXISTS 相关子查询表达，避免突破单条 SQL <= 3 表 JOIN 约束。
+      不携带企业画像明细、不做 GROUP_CONCAT，保持轻量。
+    -->
+    <select id="selectEnterpriseProfilesByChainId"
+            resultMap="enterpriseProfileRowMap">
+        SELECT r.enterprise_id,
+               r.node_id,
+               n.node_path,
+               CASE WHEN e.output_value IS NOT NULL THEN 1 ELSE 0 END AS has_output_value,
+               CASE WHEN e.tax_amount IS NOT NULL THEN 1 ELSE 0 END AS has_tax_amount,
+               CASE WHEN EXISTS (
+                   -- enterprise_tag_rel 无逻辑删除列，无需过滤
+                   SELECT 1 FROM enterprise_tag_rel t
+                   WHERE t.enterprise_id = e.id
+               ) THEN 1 ELSE 0 END AS has_tag,
+               CASE WHEN e.main_products IS NOT NULL
+                   AND e.main_products != '' THEN 1 ELSE 0 END AS has_main_products,
+               CASE WHEN e.core_tech IS NOT NULL
+                   AND e.core_tech != '' THEN 1 ELSE 0 END AS has_core_tech
+        FROM enterprise_node_rel r
+        INNER JOIN chain_node n ON n.id = r.node_id
+        INNER JOIN enterprise e ON e.id = r.enterprise_id
+        WHERE n.chain_id = #{chainId}
+          AND n.is_deleted = 0
+          AND r.is_deleted = 0
+          AND e.is_deleted = 0
+    </select>
+
+    <!--
+      7.4 报告上下文口径：一次查询取该链下全部有效挂链企业的画像明细
+      （名称/状态/地区/行业/主营产品/核心技术/产值/税收/标签名）。
+      JOIN chain_node + enterprise_node_rel + enterprise 共 3 张表；
+      标签名集合用 GROUP_CONCAT 相关子查询表达（含 tag 表 JOIN，子查询内部 2 表），
+      has_tag 由 tag_names IS NOT NULL 派生，避免 EXISTS + GROUP_CONCAT 双子查询冗余。
+      与 selectEnterpriseProfilesByChainId 分离，7.1 健康度路径零性能回退。
+    -->
+    <select id="selectEnterpriseProfilesByChainIdForReport"
+            resultMap="enterpriseProfileDetailRowMap">
+        SELECT r.enterprise_id,
+               r.node_id,
+               e.enterprise_name,
+               e.status,
+               e.region,
+               e.industry,
+               e.main_products,
+               e.core_tech,
+               e.output_value,
+               e.tax_amount,
+               (
+                   SELECT GROUP_CONCAT(tg.tag_name SEPARATOR ',')
+                   FROM enterprise_tag_rel etr
+                   INNER JOIN `tag` tg ON tg.id = etr.tag_id
+                   WHERE etr.enterprise_id = e.id
+                     AND tg.is_deleted = 0
+               ) AS tag_names
+        FROM enterprise_node_rel r
+        INNER JOIN chain_node n ON n.id = r.node_id
+        INNER JOIN enterprise e ON e.id = r.enterprise_id
+        WHERE n.chain_id = #{chainId}
+          AND n.is_deleted = 0
+          AND r.is_deleted = 0
+          AND e.is_deleted = 0
+    </select>
+
+    <!--
+      查询某链下已采纳/待决策的历史挂链推荐证据。
+      matching_result mr + matching_task mt + enterprise e 共 3 表 JOIN。
+      matching_result / matching_task 无逻辑删除列；enterprise 过滤 is_deleted=0。
+      limit 由调用方控制（实现文档建议上限 100）。
+    -->
+    <select id="selectMatchingEvidenceByChainId"
+            resultMap="matchingEvidenceRowMap">
+        SELECT mr.id        AS result_id,
+               mr.task_id   AS task_id,
+               mt.enterprise_id AS enterprise_id,
+               e.enterprise_name AS enterprise_name,
+               mr.node_id   AS node_id,
+               mr.confidence AS confidence,
+               mr.reason    AS reason,
+               mr.evidence  AS evidence,
+               mr.decision  AS decision,
+               mr.created_at AS created_at
+        FROM matching_result mr
+        INNER JOIN matching_task mt ON mt.id = mr.task_id
+        INNER JOIN enterprise e ON e.id = mt.enterprise_id
+        WHERE mt.chain_id = #{chainId}
+          AND e.is_deleted = 0
+          AND mr.decision IN ('ACCEPTED', 'PENDING')
+        ORDER BY mr.created_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

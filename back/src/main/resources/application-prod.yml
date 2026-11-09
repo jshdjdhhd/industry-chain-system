@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 7200
+  cors:
+    allowed-origins:
+      - ${CORS_ORIGIN}
+
+logging:
+  level:
+    root: WARN
+    git.ggwzz: INFO
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl

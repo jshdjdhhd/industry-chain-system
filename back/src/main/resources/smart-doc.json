@@ -1,0 +1,27 @@
+{
+    "serverUrl": "http://localhost:8080",
+    "isStrict": false,
+    "allInOne": true,
+    "outPath": "src/main/resources/static/doc",
+    "coverOld": true,
+    "createDebugPage": false,
+    "packageFilters": "git.ggwzz.auth.controller.*,git.ggwzz.*.controller.*",
+    "requestHeaders": [
+        {
+            "name": "Authorization",
+            "type": "string",
+            "desc": "Bearer 访问令牌，格式: Bearer <token>",
+            "value": "Bearer ",
+            "required": false,
+            "since": "-"
+        }
+    ],
+    "errorCodeDictionaries": [
+        {
+            "title": "统一响应码",
+            "enumClassName": "git.ggwzz.common.api.ResultCode",
+            "codeField": "code",
+            "descField": "message"
+        }
+    ]
+}
